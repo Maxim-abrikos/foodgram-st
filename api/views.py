@@ -1,4 +1,4 @@
-from django.http import HttpResponse
+﻿from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -22,17 +22,20 @@ import shortuuid
 
 User = get_user_model()
 
+# Ингредиенты можно только смотреть (не добавлять/удалять)
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ('name',)
-    search_fields = ('^name',)
+    search_fields = ('^name',)  # Поиск по началу названия
 
+# Теги тоже только на чтение
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
 
+# Полноценный viewset для рецептов: можно создавать, редактировать, удалять, читать
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     permission_classes = (IsAuthorOrReadOnly,)
@@ -40,11 +43,13 @@ class RecipeViewSet(viewsets.ModelViewSet):
     filterset_class = RecipeFilter
 
     def get_serializer_class(self):
+        # Используем разный сериализатор для чтения и записи
         if self.action in ('create', 'partial_update'):
             return RecipeCreateUpdateSerializer
         return RecipeListSerializer
 
     def get_queryset(self):
+        # Добавляем фильтрацию по избранному и корзине — вручную, если юзер залогинен
         queryset = super().get_queryset()
         user = self.request.user
         if user.is_authenticated:
@@ -56,6 +61,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(shoppingcart_set__user=user)
         return queryset
 
+    # Добавить/удалить рецепт в избранное
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):
         recipe = get_object_or_404(Recipe, pk=pk)
@@ -72,6 +78,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             favorite.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
+    # Добавить/удалить рецепт в список покупок
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def shopping_cart(self, request, pk=None):
         recipe = get_object_or_404(Recipe, pk=pk)
@@ -88,6 +95,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             cart.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
+    # Заглушка под короткие ссылки (можно доработать при желании)
     @action(detail=True, methods=['get'])
     def get_link(self, request, pk=None):
         recipe = get_object_or_404(Recipe, pk=pk)
@@ -95,6 +103,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         short_link = f"http://localhost/s/{short_id}"
         return Response({'short-link': short_link})
 
+    # Скачивание списка покупок в PDF
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def download_shopping_cart(self, request):
         ingredients = RecipeIngredient.objects.filter(
@@ -117,20 +126,24 @@ class RecipeViewSet(viewsets.ModelViewSet):
         response['Content-Disposition'] = 'attachment; filename=shopping_list.pdf'
         return response
 
+# Управление пользователями (через API)
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = CustomUserSerializer
 
     def get_permissions(self):
+        # Разрешаем всем читать, а писать — только авторизованным
         if self.action in ('list', 'retrieve'):
             return [AllowAny()]
         return super().get_permissions()
 
+    # Возвращает данные о текущем пользователе
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
+    # Добавление/удаление аватара
     @action(detail=False, methods=['put', 'delete'], permission_classes=[IsAuthenticated])
     def avatar(self, request):
         if request.method == 'PUT':
@@ -143,6 +156,7 @@ class UserViewSet(viewsets.ModelViewSet):
             request.user.avatar.delete(save=True)
             return Response(status=status.HTTP_204_NO_CONTENT)
 
+    # Список тех, на кого подписан пользователь
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def subscriptions(self, request):
         queryset = User.objects.filter(subscribers__user=request.user)
@@ -150,6 +164,7 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserWithRecipesSerializer(page, many=True, context={'request': request})
         return self.get_paginated_response(serializer.data)
 
+    # Подписка/отписка на пользователя
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def subscribe(self, request, pk=None):
         author = get_object_or_404(User, pk=pk)
