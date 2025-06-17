@@ -8,10 +8,11 @@ class Ingredient(models.Model):
     measurement_unit = models.CharField(max_length=64)  # Единица измерения (г, мл, шт)
 
     class Meta:
-        ordering = ['name']  # Сортировка по имени
+        ordering = ["name"]  # Сортировка по имени
 
     def __str__(self):
         return f"{self.name} ({self.measurement_unit})"
+
 
 # Тег для рецепта, например: "Завтрак", "Вегетарианское"
 class Tag(models.Model):
@@ -22,21 +23,23 @@ class Tag(models.Model):
     def __str__(self):
         return self.name
 
+
 # Основная модель рецепта
 class Recipe(models.Model):
-    author = models.ForeignKey(User, related_name='recipes', on_delete=models.CASCADE)  # Кто создал рецепт
+    author = models.ForeignKey(User, related_name="recipes", on_delete=models.CASCADE)  # Кто создал рецепт
     name = models.CharField(max_length=256)  # Название рецепта
-    image = models.ImageField(upload_to='recipes/images/')  # Картинка рецепта
+    image = models.ImageField(upload_to="recipes/images/")  # Картинка рецепта
     text = models.TextField()  # Описание, способ приготовления
-    ingredients = models.ManyToManyField(Ingredient, through='RecipeIngredient')  # Ингредиенты через связь
+    ingredients = models.ManyToManyField(Ingredient, through="RecipeIngredient")  # Ингредиенты через связь
     tags = models.ManyToManyField(Tag)  # Теги — можно выбрать несколько
     cooking_time = models.PositiveIntegerField(validators=[MinValueValidator(1)])  # Время готовки в минутах
 
     class Meta:
-        ordering = ['-id']  # Сортировка: сначала новые рецепты
+        ordering = ["-id"]  # Сортировка: сначала новые рецепты
 
     def __str__(self):
         return self.name
+
 
 # Связующая таблица "ингредиент в рецепте" с указанием количества
 class RecipeIngredient(models.Model):
@@ -45,7 +48,8 @@ class RecipeIngredient(models.Model):
     amount = models.PositiveIntegerField(validators=[MinValueValidator(1)])  # Сколько нужно (не менее 1)
 
     class Meta:
-        unique_together = ('recipe', 'ingredient')  # Нельзя добавить один и тот же ингредиент дважды
+        unique_together = ("recipe", "ingredient")  # Нельзя добавить один и тот же ингредиент дважды
+
 
 # Модель "Избранное" — пользователь добавил рецепт в любимые
 class Favorite(models.Model):
@@ -53,7 +57,8 @@ class Favorite(models.Model):
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
 
     class Meta:
-        unique_together = ('user', 'recipe')  # Один пользователь не может добавить один рецепт в избранное дважды
+        unique_together = ("user", "recipe")  # Один пользователь не может добавить один рецепт в избранное дважды
+
 
 # Модель "Список покупок" — пользователь добавил рецепт в корзину
 class ShoppingCart(models.Model):
@@ -61,4 +66,4 @@ class ShoppingCart(models.Model):
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
 
     class Meta:
-        unique_together = ('user', 'recipe')  # Один и тот же рецепт не может быть дважды в корзине
+        unique_together = ("user", "recipe")  # Один и тот же рецепт не может быть дважды в корзине
